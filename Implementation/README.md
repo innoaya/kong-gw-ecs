@@ -1,0 +1,262 @@
+# Kong Gateway Implementation Guide
+
+This directory contains the implementation files and deployment documentation for Kong Gateway running in Hybrid Mode on AWS ECS Fargate.
+
+> 📐 **Architecture & Design**: See the [Architecture Overview](../README.md) for system design, diagrams, and rationale  
+> 💰 **Cost Analysis**: See [Cost Estimation](../COST-ESTIMATION.md) for detailed monthly cost breakdown  
+> 📦 **AWS Services**: See [AWS Services Inventory](../AWS-SERVICES.md) for complete service catalog
+
+> 📋 **Before starting**: See [CONFIGURATION_CHECKLIST.md](CONFIGURATION_CHECKLIST.md) for a complete list of values you need to update before deployment.
+
+## Architecture
+
+- **Control Plane**: Manages Kong configuration, connected to Aurora PostgreSQL
+- **Data Plane**: Handles API traffic, DB-less mode, connects to Control Plane via mTLS
+- **Service Discovery**: AWS Cloud Map for internal DNS resolution
+- **Load Balancing**: Application Load Balancer for public access
+
+## Configuration Required
+
+⚠️ **Before deployment**, you must update the following placeholders in the task definition files:
+
+### 1. AWS Account ID
+Replace `<YOUR_AWS_ACCOUNT_ID>` with your AWS account ID in all task definition files:
+- `kong-cp-task-definition.json`
+- `kong-dp-task-definition.json`
+- `kong-migrations-task-definition.json`
+
+**Location**: `executionRoleArn` and `taskRoleArn` fields
+
+**Example**: 
+```json
+"executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole"
+```
+
+### 2. Aurora PostgreSQL Endpoint
+Replace `<YOUR_AURORA_ENDPOINT>` with your Aurora database endpoint in:
+- `kong-cp-task-definition.json` → `KONG_PG_HOST`
+- `kong-migrations-task-definition.json` → `KONG_PG_HOST`
+
+**Example**:
+```json
+{
+  "name": "KONG_PG_HOST",
+  "value": "kong-db.cluster-xxxxx.ap-southeast-1.rds.amazonaws.com"
+}
+```
+
+### 3. Database Credentials
+Replace placeholders with your actual database credentials in:
+- `kong-cp-task-definition.json` → `KONG_PG_USER`, `KONG_PG_PASSWORD`
+- `kong-migrations-task-definition.json` → `KONG_PG_USER`, `KONG_PG_PASSWORD`
+
+Replace:
+- `<YOUR_DB_USERNAME>` with your database username
+- `<YOUR_DB_PASSWORD>` with your database password
+
+**⚠️ Security Note**: For production, use AWS Secrets Manager instead of plaintext credentials. See [DEPLOYMENT.md](DEPLOYMENT.md) for details.
+
+**Example**:
+```json
+{
+  "name": "KONG_PG_USER",
+  "value": "kongadmin"
+},
+{
+  "name": "KONG_PG_PASSWORD",
+  "value": "your-secure-password"
+}
+```
+
+### 4. Cluster Certificates
+Replace certificate placeholders with actual content from generated files:
+- `kong-cp-task-definition.json` → `CLUSTER_CERT_CONTENT`, `CLUSTER_KEY_CONTENT`
+- `kong-dp-task-definition.json` → `CLUSTER_CERT_CONTENT`, `CLUSTER_KEY_CONTENT`
+
+**Steps**:
+1. Run `./generate-shared-mtls-cert.sh` to generate certificates
+2. Copy content from `CLUSTER_CERT_CONTENT.txt` 
+3. Copy content from `CLUSTER_KEY_CONTENT.txt`
+4. Paste into respective fields in task definitions
+
+**Example**:
+```json
+{
+  "name": "CLUSTER_CERT_CONTENT",
+  "value": "-----BEGIN CERTIFICATE-----\nMIIC9jCCAd4C...\n-----END CERTIFICATE-----\n"
+}
+```
+
+## Quick Start
+
+1. **Setup Infrastructure**: Create all AWS resources (VPC, subnets, security groups, Aurora, IAM roles, etc.)
+   - **📖 See [INFRASTRUCTURE-SETUP.md](INFRASTRUCTURE-SETUP.md)** for complete infrastructure creation guide
+   - Options: AWS Console (easiest), CLI commands, or Terraform
+2. **Configure Task Definitions**: Update all placeholders as described above
+3. **Generate Certificates**: Run `./generate-shared-mtls-cert.sh`
+4. **Database Migration**: Run initial migrations using `kong-migrations-task-definition.json`
+5. **Deploy Control Plane**: Register and deploy `kong-cp-task-definition.json`
+6. **Deploy Data Plane**: Register and deploy `kong-dp-task-definition.json`
+7. **Secure Admin API**: Configure security plugins
+
+## Files
+
+- **README.md**: This file - Quick start guide and overview
+- **INFRASTRUCTURE-SETUP.md**: Complete guide to create all AWS resources from scratch
+- **DEPLOYMENT.md**: Kong deployment steps after infrastructure is ready
+- **ECS-EXEC-GUIDE.md**: Guide for debugging containers using ECS Exec
+- **CONFIGURATION_CHECKLIST.md**: Checklist to track required configuration changes
+- **kong-cp-task-definition.json**: Control Plane ECS task definition (⚠️ requires configuration)
+- **kong-dp-task-definition.json**: Data Plane ECS task definition (⚠️ requires configuration)
+- **kong-migrations-task-definition.json**: Database migration task definition (⚠️ requires configuration)
+- **iam-task-role-policy.json**: IAM policy for ECS Exec access (⚠️ requires configuration)
+- **generate-shared-mtls-cert.sh**: Script to generate mTLS certificates
+- **run-migrations.sh**: Helper script to run database migrations
+- **verify-deployment.sh**: Script to verify deployment health
+- **CLUSTER_CERT_CONTENT.txt**: Cluster certificate (generated by script)
+- **CLUSTER_KEY_CONTENT.txt**: Cluster private key (generated by script)
+
+## Important Configuration
+
+### Control Plane
+- **Ports**: 8001 (Admin API), 8005 (Cluster)
+- **Database**: Aurora PostgreSQL
+- **Network**: Private subnet
+- **Discovery**: Registered as `config.kong.local`
+
+### Data Plane
+- **Port**: 8000 (Proxy)
+- **Database**: None (DB-less)
+- **Network**: Public subnet
+- **Access**: Via Application Load Balancer
+
+## First-Time Setup
+
+### 1. Run Database Migrations
+
+Before deploying the Control Plane, initialize the database:
+
+```bash
+# Update database credentials in kong-migrations-task-definition.json
+# Then register and run the migration task
+
+aws ecs register-task-definition \
+  --cli-input-json file://kong-migrations-task-definition.json
+
+aws ecs run-task \
+  --cluster kong-gateway-cluster \
+  --task-definition kong-migrations \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-private-1],
+    securityGroups=[sg-kong-cp],
+    assignPublicIp=DISABLED
+  }"
+
+# Monitor logs
+aws logs tail /fargate/kong-migrations --follow
+```
+
+Expected output: `Database is up-to-date`
+
+### 2. Verify Database
+
+```bash
+psql -h <aurora-endpoint> -U kongadmin -d kong -c "\dt"
+```
+
+Should show Kong tables: `acls`, `acme_storage`, `apis`, `basicauth_credentials`, etc.
+
+## Script Configuration
+
+If you plan to use the helper scripts, update these variables:
+
+### run-migrations.sh
+```bash
+SUBNET_ID="subnet-private-1"      # Your private subnet ID
+SECURITY_GROUP="sg-kong-cp"       # Your control plane security group ID
+```
+
+### verify-deployment.sh
+No configuration needed - uses AWS CLI to auto-detect resources.
+
+## Security Notes
+
+⚠️ **IMPORTANT**: 
+- Update database credentials in task definitions (use AWS Secrets Manager in production)
+- Replace certificate contents with your generated certificates
+- Never commit credentials to version control
+- Update IP whitelist for admin API access
+- Generate strong API keys for admin API authentication
+
+## Monitoring
+
+- **CloudWatch Logs**:
+  - Control Plane: `/fargate/kong-controlplane-logs`
+  - Data Plane: `/fargate/kong-dataplane-logs`
+  - Migrations: `/fargate/kong-migrations`
+
+- **Health Checks**:
+  - Control Plane: `http://config.kong.local:8001/status`
+  - Data Plane: `http://<alb-dns>/status`
+
+## Common Commands
+
+```bash
+# Check cluster status
+curl http://config.kong.local:8001/clustering/data-planes
+
+# List services
+curl http://config.kong.local:8001/services
+
+# Access admin API via data plane
+curl -H "apikey: YOUR-KEY" http://<alb-dns>/admin-api/services
+
+# Backup configuration
+curl http://config.kong.local:8001/config -o kong-backup.json
+```
+
+## Debugging
+
+### Access Running Containers
+
+Use ECS Exec to debug running containers (like `docker exec`):
+
+```bash
+# Get task ID
+aws ecs list-tasks --cluster kong-gateway-cluster --service-name kong-control-plane
+
+# Access container
+aws ecs execute-command \
+  --cluster kong-gateway-cluster \
+  --task <TASK_ID> \
+  --container kong-control \
+  --interactive \
+  --command "/bin/sh"
+```
+
+**📖 See [ECS-EXEC-GUIDE.md](ECS-EXEC-GUIDE.md)** for complete debugging guide, including:
+- IAM permissions setup
+- Session Manager plugin installation
+- Common debugging commands
+- Helper scripts
+
+## Troubleshooting
+
+See [DEPLOYMENT.md](DEPLOYMENT.md#troubleshooting) for detailed troubleshooting steps.
+
+## Documentation
+
+For complete deployment instructions, configuration details, security best practices, and maintenance procedures, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Support
+
+- Kong Documentation: https://docs.konghq.com/gateway/
+- AWS ECS Documentation: https://docs.aws.amazon.com/ecs/
+- Kong Hybrid Mode: https://docs.konghq.com/gateway/latest/production/deployment-topologies/hybrid-mode/
+
+---
+
+**Region**: ap-southeast-1  
+**Environment**: UAT  
+**Last Updated**: October 2025

@@ -1,0 +1,92 @@
+{
+    "family": "kong-data-plane",
+    "containerDefinitions": [
+        {
+            "command": [
+                "sh",
+                "-c",
+                "mkdir -p /etc/kong/certs && echo \"$CLUSTER_CERT_CONTENT\" > /etc/kong/certs/cluster.crt && echo \"$CLUSTER_KEY_CONTENT\" > /etc/kong/certs/cluster.key && exec kong start"
+            ],
+            "cpu": 0,
+            "environment": [
+                {
+                    "name": "KONG_ROLE",
+                    "value": "data_plane"
+                },
+                {
+                    "name": "KONG_CLUSTER_CONTROL_PLANE",
+                    "value": "config.kong.local:8005"
+                },
+                {
+                    "name": "KONG_CLUSTER_CERT_KEY",
+                    "value": "/etc/kong/certs/cluster.key"
+                },
+                {
+                    "name": "KONG_PROXY_ACCESS_LOG",
+                    "value": "/dev/stdout"
+                },
+                {
+                    "name": "KONG_PROXY_ERROR_LOG",
+                    "value": "/dev/stderr"
+                },
+                {
+                    "name": "KONG_PROXY_LISTEN",
+                    "value": "0.0.0.0:8000"
+                },
+                {
+                    "name": "KONG_DATABASE",
+                    "value": "off"
+                },
+                {
+                    "name": "KONG_CLUSTER_CERT",
+                    "value": "/etc/kong/certs/cluster.crt"
+                },
+                {
+                    "name": "KONG_CLUSTER_SERVER_NAME",
+                    "value": "config.kong.local"
+                },
+                {
+                    "name": "CLUSTER_CERT_CONTENT",
+                    "value": "<PASTE_CONTENT_FROM_CLUSTER_CERT_CONTENT.txt>"
+                },
+                {
+                    "name": "CLUSTER_KEY_CONTENT",
+                    "value": "<PASTE_CONTENT_FROM_CLUSTER_KEY_CONTENT.txt>"
+                }
+            ],
+            "essential": true,
+            "image": "kong:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "fargate/kong-dataplane-logs",
+                    "awslogs-region": "ap-southeast-1",
+                    "awslogs-stream-prefix": "fargate"
+                },
+                "secretOptions": []
+            },
+            "mountPoints": [],
+            "name": "kong-data",
+            "portMappings": [
+                {
+                    "containerPort": 8000,
+                    "hostPort": 8000,
+                    "name": "kong-data-8000-tcp",
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": []
+        }
+    ],
+    "cpu": "512",
+    "memory": "1024",
+    "executionRoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/ecsTaskExecutionRole",
+    "taskRoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/kong-gw-TaskRole",
+    "networkMode": "awsvpc",
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "volumes": []
+}

@@ -1,0 +1,58 @@
+{
+  "family": "kong-migrations",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/kong-gw-TaskRole",
+  "containerDefinitions": [
+    {
+      "name": "kong-migrations",
+      "image": "kong:latest",
+      "essential": true,
+      "command": [
+        "kong",
+        "migrations",
+        "bootstrap"
+      ],
+      "environment": [
+        {
+          "name": "KONG_DATABASE",
+          "value": "postgres"
+        },
+        {
+          "name": "KONG_PG_HOST",
+          "value": "<YOUR_AURORA_ENDPOINT>"
+        },
+        {
+          "name": "KONG_PG_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "KONG_PG_DATABASE",
+          "value": "kong"
+        },
+        {
+          "name": "KONG_PG_USER",
+          "value": "<YOUR_DB_USERNAME>"
+        },
+        {
+          "name": "KONG_PG_PASSWORD",
+          "value": "<YOUR_DB_PASSWORD>"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/fargate/kong-migrations",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "migrations",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}
