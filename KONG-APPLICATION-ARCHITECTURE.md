@@ -63,6 +63,46 @@ classDef node fill:#f3f4f6,stroke:#2563EB,stroke-width:1px,corner-radius:8px;
 class A1,A2,A3,A4,A5,B1,B2,B3,B4,C1,D1 node;
 ```
 
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': {'primaryColor': '#2563EB', 'edgeLabelBackground':'#fff','fontSize':'14px'}}}%%
+flowchart LR
+
+    %% --- Clients & External ---
+    C1[🌍 API Consumers<br/>Mobile/Web Clients] -->|"API Requests (HTTP/HTTPS)<br/>Port 8000/8443"| DP1
+    
+    %% --- Data Plane ---
+    subgraph DP["🛰️ Data Plane (KONG_ROLE=data_plane)"]
+        DP1[Proxy Service<br/>Handles API traffic<br/>KONG_PROXY_LISTEN=8000] 
+        DP2[Plugins & Policies<br/>Executes Auth, Rate Limit, etc.]
+        DP3[Cluster Agent<br/>Sync Configs via Port 8005]
+        DP1 --> DP2 --> DP3
+    end
+
+    %% --- Control Plane ---
+    subgraph CP["🧠 Control Plane (KONG_ROLE=control_plane)"]
+        CP1["Kong Manager UI<br/>Port 8002/8445 (Enterprise only)"]
+        CP2[Admin API<br/>Manage Routes, Services<br/>Port 8001/8444]
+        CP3[PostgreSQL DB<br/>Stores Config & State]
+        CP4[Cluster Listener<br/>Port 8005<br/>mTLS Required]
+        CP2 --> CP3
+        CP2 --> CP4
+        CP1 --> CP2
+    end
+
+    %% --- Hybrid Sync ---
+    DP3 -->|Configuration Sync<br/>mTLS over 8005| CP4
+    CP4 -->|Push Config Updates| DP3
+
+    %% --- Database Flow ---
+    CP3 -. "Persistent Storage (Aurora/PostgreSQL)" .- CP2
+
+    %% --- Labels ---
+    classDef cp fill:#E0F2FE,stroke:#2563EB,stroke-width:1px,color:#1E3A8A;
+    classDef dp fill:#EEF2FF,stroke:#7C3AED,stroke-width:1px,color:#312E81;
+    class CP,CP1,CP2,CP3,CP4 cp;
+    class DP,DP1,DP2,DP3 dp;
+```
+
 ---
 
 ## 3. Component Descriptions
