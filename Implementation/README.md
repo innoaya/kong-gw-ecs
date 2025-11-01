@@ -92,12 +92,12 @@ Replace certificate placeholders with actual content from generated files:
 1. **Setup Infrastructure**: Create all AWS resources (VPC, subnets, security groups, Aurora, IAM roles, etc.)
    - **📖 See [INFRASTRUCTURE-SETUP.md](INFRASTRUCTURE-SETUP.md)** for complete infrastructure creation guide
    - Options: AWS Console (easiest), CLI commands, or Terraform
-2. **Configure Task Definitions**: Update all placeholders as described above
-3. **Generate Certificates**: Run `./generate-shared-mtls-cert.sh`
-4. **Database Migration**: Run initial migrations using `kong-migrations-task-definition.json`
-5. **Deploy Control Plane**: Register and deploy `kong-cp-task-definition.json`
-6. **Deploy Data Plane**: Register and deploy `kong-dp-task-definition.json`
-7. **Secure Admin API**: Configure security plugins
+2. **Generate Certificates**: Run `./generate-shared-mtls-cert.sh`
+3. **Configure Task Definitions**: Update all placeholders as described above
+5. **Database Migration**: Run initial migrations using `kong-migrations-task-definition.json`
+6. **Deploy Control Plane**: Register and deploy `kong-cp-task-definition.json`
+7. **Deploy Data Plane**: Register and deploy `kong-dp-task-definition.json`
+8. **Secure Admin API**: Configure security plugins
 
 ## Files
 
