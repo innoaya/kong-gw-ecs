@@ -111,21 +111,17 @@ class A1,A2,A3,A4,A5,B1,B2,B3,B4,C1,D1 node;
 ## 6. Official References
 
 * Kong Gateway Hybrid Mode Overview:
-  🔗 [https://docs.konghq.com/gateway/latest/hybrid-mode/overview/](https://docs.konghq.com/gateway/latest/hybrid-mode/overview/)
+  🔗 [https://developer.konghq.com/gateway/hybrid-mode/](https://developer.konghq.com/gateway/hybrid-mode/)
 
 * Control Plane & Data Plane Setup:
-  🔗 [https://docs.konghq.com/gateway/latest/hybrid-mode/setup/](https://docs.konghq.com/gateway/latest/hybrid-mode/setup/)
+  🔗 [https://docs.konghq.com/gateway/latest/production/deployment-topologies/hybrid-mode/](https://docs.konghq.com/gateway/latest/production/deployment-topologies/hybrid-mode/)
+
+* Kong Configuration Reference (cluster_listen, cluster_control_plane):
+  🔗 [https://docs.konghq.com/gateway/latest/reference/configuration/](https://docs.konghq.com/gateway/latest/reference/configuration/)
 
 * Admin API Documentation:
   🔗 [https://docs.konghq.com/gateway/latest/admin-api/](https://docs.konghq.com/gateway/latest/admin-api/)
 
-* Plugin Execution Lifecycle:
+* Plugin Development & Execution Lifecycle:
   🔗 [https://docs.konghq.com/gateway/latest/plugin-development/custom-logic/](https://docs.konghq.com/gateway/latest/plugin-development/custom-logic/)
-
-* Cluster Communication & Ports:
-  🔗 [https://docs.konghq.com/gateway/latest/hybrid-mode/production-deployment/](https://docs.konghq.com/gateway/latest/hybrid-mode/production-deployment/)
-
 ---
-
-**Author:** AWS Solution Architect Project
-**Purpose:** To describe Kong Gateway's Application Architecture focusing on Control Plane and Data Plane interaction, including component ports.
